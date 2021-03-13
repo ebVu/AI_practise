@@ -20,7 +20,7 @@ train_ds_ratio = 0.8
 valid_ds_ratio = 0.1
 test_ds_ratio = 0.1
 race = {"white":0, "black":1, "asian":2, "indian":3, "others":4}
-database_path = "/media/sf_RZV/DeepLearning/group_practise/database/UTKFace"
+database_path = "/media/sf_RZV/DeepLearning/group_practise/myworking/AI_practise/workspace/database/UTKFace"
 predictor_path = "shape_predictor_68_face_landmarks.dat"
 face_detector = dlib.get_frontal_face_detector()
 face_predictor = dlib.shape_predictor(predictor_path)
@@ -31,12 +31,12 @@ patches = {1: [37, 38], 2: [45, 46], 3: [38,39], 4: [44, 45], 5: [39, 40],
         16: [54, 55, 56, 65], 17: [28, 29, 30], 18: [29, 30, 31],
         19: [51, 52, 53, 62, 63, 64], 20: [57, 58, 59, 66, 67, 68],
         21: [8, 9, 10]}
-middle_landmark_patches = [17, 18, 19, 20] #, 21]
+middle_landmark_patches = [17, 18, 19, 20, 21]
 left_landmark_patches =  [1, 3, 5, 7, 9, 11, 13, 15] + middle_landmark_patches    
 right_landmark_patches = [2, 4, 6, 8, 10, 12, 14, 16] + middle_landmark_patches
 patches_scale = []
-patches_scale.append(list(range(1, 21))) #22)))
-patches_scale.append([11, 12, 15, 16, 17, 18, 20]) #, 21])
+patches_scale.append(list(range(1, 22))) 
+patches_scale.append([11, 12, 15, 16, 17, 18, 20, 21])
 patches_scale.append([11, 12, 17, 19])
 patches_scale.append([18])
 remove_list = []
@@ -157,7 +157,7 @@ def build_cnn():
 
     sub_cnn_arr = []
     img_input_arr = []
-    for i in range (21): #23):
+    for i in range (23):
         img_input_arr.append(Input(shape=(48, 48, 1)))
         sub_cnn_arr.append(sub_cnn(img_input_arr[i]))
     fcn = concatenate(sub_cnn_arr)
@@ -169,13 +169,15 @@ def build_cnn():
     print(model.summary())
     model.compile('sgd', 'categorical_crossentropy', ['accuracy'])
     return model
+
 ####################################################################
 
 database = pd.read_csv('UTKFace.csv')
+database = database.dropna()
 dlib_predictor_path = "shape_predictor_68_face_landmarks.dat"
-age_selection_1 = (database.Age < maximum_age)
-age_selection_2 = (database.Age >= minimum_age)
-gender_selection = (database.Race == race["asian"])
+age_selection_1 = (database.Age.astype(int) < maximum_age)
+age_selection_2 = (database.Age.astype(int) >= minimum_age)
+gender_selection = (database.Race.astype(int) == race["asian"])
 
 data_filters = age_selection_1 & age_selection_2 & gender_selection
 database = database[data_filters]
@@ -194,7 +196,8 @@ model = build_cnn()
 for img_count in range (0, 100):
     err = create_face_patches(train_ds['Filename'].values[img_count])
     if (err == True):
-        break
+        print("error create face patches")
+        continue
     #prepare left input
     for i in range(4): 
         for pid in patches_scale[i]:
