@@ -43,7 +43,7 @@ remove_list = []
 left_input=[]
 right_input=[]
 image_input = []
-
+checkpoint_path = "model/cp.ckpt"
 class Input_Image:
     def __init__(self, scale, patch_id, img):
         self.scale = scale
@@ -62,6 +62,8 @@ def get_image_label(ds):
     return image, label
 def create_face_patches(file_name):
     print("Processing file: {}".format(file_name))
+    print("Processing file: {}".format('/media/sf_RZV/DeepLearning/group_practise/myworking/AI_practise/workspace/database/UTKFace/100_0_0_20170112213500903.jpg'))
+    print("file name:",  file_name)
     err_flag = False
     img = dlib.load_rgb_image(file_name)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -170,6 +172,11 @@ def build_cnn():
     model.compile('sgd', 'categorical_crossentropy', ['accuracy'])
     return model
 
+def decode_jpeg(filename):
+    bits = tf.io.read_file(filename)
+    image = tf.image.decode_jpeg(bits)
+    return image
+
 ####################################################################
 
 database = pd.read_csv('UTKFace.csv')
@@ -193,11 +200,27 @@ test_ds = database_ex_train.drop(valid_ds.index)
 model = build_cnn()
 
 #debug
-for img_count in range (0, 100):
-    err = create_face_patches(train_ds['Filename'].values[img_count])
-    if (err == True):
-        print("error create face patches")
-        continue
+def decode_jpeg_and_label(file_name):
+    print("Processing file: {}".format(file_name))
+    
+    print("file_path: ",bytes.decode(file_name),type(bytes.decode(file_name)))
+    print("debug 0")
+    file_name_ = tf.make_tensor_proto(file_name, dtype= tf.string)
+    fn_str = tf.make_ndarray(file_name_) 
+    print("debug1")
+
+    err = create_face_patches(fn_str)
+    print("debug2")
+    label = tf.strings.split(tf.expand_dims(file_name, axis=-1), sep='/')
+    label = tf.strings.split(tf.expand_dims(label.values[-1], axis=-1), sep='_')
+    label = label.values[0]
+    label = tf.strings.to_number(label, out_type=tf.dtypes.int32)
+    print("label", label)
+    err = create_face_patches(fn_str)
+    #if (err == True):
+    #    print("error create face patches")
+    #    return -1, -1
+
     #prepare left input
     for i in range(4): 
         for pid in patches_scale[i]:
@@ -219,17 +242,53 @@ for img_count in range (0, 100):
 
     #print('lengh of left input', len(left_input))
     #print('lengh of right input', len(right_input))
+    return left_input, label
+#image_traindataset_ = tf.data.Dataset.from_tensor_slices((train_ds['Filename'].values.tolist(), train_ds['Age'].values.tolist()))
+image_traindataset_ = tf.data.Dataset.list_files(train_ds['Filename'].values.tolist(), shuffle=True)
+image_traindataset = image_traindataset_.map(lambda x: tf.py_function(decode_jpeg_and_label, [x], [tf.uint8]))
 
-    X = left_input
-    y = np.zeros((1, maximum_age - minimum_age + 1))
-    y[0][train_ds['Age'].values[img_count]] = 1
+#image_traindataset = image_traindataset.apply(tf.data.experimental.ignore_errors()) 
+#image_validdataset_ = tf.data.Dataset.from_tensor_slices((train_ds['Filename'].values.tolist(), train_ds['Age'].values.tolist()))
+image_validdataset_ = tf.data.Dataset.list_files(valid_ds['Filename'].values.tolist(), shuffle=True)
+image_validdataset = image_validdataset_.map(lambda x: tf.py_function(decode_jpeg_and_label, [x], [tf.uint8]))
+#image_validdataset = image_validdataset.apply(tf.data.experimental.ignore_errors()) 
+#image_testdataset_ = tf.data.Dataset.from_tensor_slices((train_ds['Filename'].values.tolist(), train_ds['Age'].values.tolist()))
+image_testdataset_ = tf.data.Dataset.list_files(test_ds['Filename'].values.tolist(), shuffle=True)
+image_testdataset = image_testdataset_.map(lambda x: tf.py_function(decode_jpeg_and_label, [x], [tf.uint8]))
+#image_testdataset = image_testdataset.apply(tf.data.experimental.ignore_errors()) 
+train_ds_size = tf.data.experimental.cardinality(image_traindataset)
+validation_ds_size = tf.data.experimental.cardinality(image_validdataset)
+test_ds_size = tf.data.experimental.cardinality(image_testdataset)
+train_ds = (image_traindataset
+#            .map(process_images)
+#            .shuffle(buffer_size=train_ds_size)
+            .batch(batch_size=32, drop_remainder=True))
+validation_ds = (image_validdataset
+#            .map(process_images)
+#            .shuffle(buffer_size=validation_ds_size)
+            .batch(batch_size=32, drop_remainder=True))
+checkpoint_dir = os.path.dirname(checkpoint_path)
+cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,save_weights_only=True,verbose=1)
+model.fit(train_ds, epochs=50, validation_data=validation_ds, validation_freq=1, callbacks=[cp_callback])
+model.save("model_alexnet_savedmodel")
+#test_loss, test_acc = model.evaluate(validation_ds)
+#print("model, accuracy: {:5.2f}%".format(100 * test_acc))
 
-    model.fit(X, y, batch_size = 1)
-    print("predict")
-    print(model.predict(X))
-    left_input = []
-    right_input = []
+
+
+
+
+X = left_input
+y = np.zeros((1, maximum_age - minimum_age + 1))
+y[0][train_ds['Age'].values[img_count]] = 1
+
+model.fit(X, y, batch_size = 1)
+print("predict")
+print(model.predict(X))
+left_input = []
+right_input = []
 print("number image need to be removed\n", len(remove_list))
+
 
 
 

@@ -13,6 +13,6 @@ with open(database_csv, 'w') as csvfile:
     for f in glob.glob(os.path.join(database_path, "*.jpg")):
         filename = os.path.basename(f)
         file_parts = filename.split('_')
-        if len(file_parts) == 4:
+        if (len(file_parts) == 4) and ("" not in file_parts):
             row = [f, file_parts[0], file_parts[1], file_parts[2]]
             csvwriter.writerow(row)
