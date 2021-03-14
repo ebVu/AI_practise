@@ -3,8 +3,7 @@ import sys
 import os
 import csv
 
-database_path = "/media/sf_RZV/DeepLearning/group_practise/myworking/AI_practise/workspace/database/UTKFace/"
-#database_path = "/media/sf_RZV/DeepLearning/group_practise/database/UTKFace/"
+database_path = "../database/UTKFace/"
 fields = ['Filename', 'Age', 'Gender', 'Race']
 database_csv = 'UTKFace.csv'
 with open(database_csv, 'w') as csvfile:
